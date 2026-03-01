@@ -11,7 +11,6 @@ plugins {
     id("net.kyori.indra.publishing") version "3.1.3"
     id("net.kyori.indra.license-header") version "3.1.3"
     id("com.gradleup.shadow") version "8.3.5"
-    id("io.github.slimjar") version "1.3.0"
     id("xyz.jpenilla.run-paper") version "2.3.1"
     id("com.github.ben-manes.versions") version "0.51.0"
     id("org.jetbrains.dokka") version "1.9.20"
@@ -19,7 +18,11 @@ plugins {
 
 group = "me.glaremasters"
 version = "3.5.7.2-SNAPSHOT"
-
+java {
+    toolchain {
+        languageVersion.set(JavaLanguageVersion.of(21))
+    }
+}
 base {
     archivesBaseName = "Guilds"
 }
@@ -48,10 +51,10 @@ repositories {
         content { includeGroup("org.codemc.worldguardwrapper") }
     }
     maven("https://repo.glaremasters.me/repository/public/")
+    maven("https://repo.papermc.io/repository/maven-public/")
 }
 
 dependencies {
-    implementation("io.github.slimjar:slimjar:1.2.7")
     implementation("co.aikar:acf-paper:0.5.1-SNAPSHOT")
     implementation("org.bstats:bstats-bukkit:3.0.2")
     implementation("co.aikar:taskchain-bukkit:3.7.2")
@@ -66,12 +69,10 @@ dependencies {
     implementation("org.jdbi:jdbi3-sqlobject:3.8.2")
     implementation("org.mariadb.jdbc:mariadb-java-client:2.7.2")
 
-    compileOnly("org.spigotmc:spigot-api:1.21.4-R0.1-SNAPSHOT")
+    compileOnly("io.papermc.paper:paper-api:1.21.4-R0.1-SNAPSHOT")
     compileOnly("net.milkbowl:vault:1.7")
     compileOnly("me.clip:placeholderapi:2.11.6")
     compileOnly("com.mojang:authlib:1.5.21")
-
-    slim("org.jetbrains.kotlin:kotlin-stdlib")
 }
 
 tasks.withType<DokkaTask>().configureEach {
@@ -93,14 +94,13 @@ tasks.withType<DokkaTask>().configureEach {
 tasks {
     build {
         dependsOn(named("shadowJar"))
-        dependsOn(named("slimJar"))
     }
 
     indra {
         mitLicense()
 
         javaVersions {
-            target(8)
+            target(21)
         }
 
         github("guilds-plugin", "guilds") {
@@ -112,7 +112,7 @@ tasks {
 
     compileKotlin {
         kotlinOptions.javaParameters = true
-        kotlinOptions.jvmTarget = "1.8"
+        kotlinOptions.jvmTarget = "21"
     }
 
     compileJava {
@@ -131,49 +131,45 @@ tasks {
     }
 
     shadowJar {
-        fun relocates(vararg dependencies: String) {
-            dependencies.forEach {
-                val split = it.split(".")
-                val name = split.last()
-                relocate(it, "me.glaremasters.guilds.libs.$name")
-            }
-        }
+        // REQUIRED: bStats must be relocated or it will refuse to run
+        relocate("org.bstats", "me.glaremasters.guilds.libs.bstats")
 
-        relocates(
-            "io.github.slimjar"
-        )
+        // Optional but recommended: keep other shaded libs out of the global namespace
+        relocate("co.aikar.taskchain", "me.glaremasters.guilds.libs.taskchain")
+        relocate("co.aikar.acf", "me.glaremasters.guilds.libs.acf")
+        relocate("dev.triumphteam.gui", "me.glaremasters.guilds.libs.triumphgui")
+        relocate("ch.jalu.configme", "me.glaremasters.guilds.libs.configme")
+        relocate("org.codemc.worldguardwrapper", "me.glaremasters.guilds.libs.worldguardwrapper")
+        relocate("com.dumptruckman.minecraft", "me.glaremasters.guilds.libs.jsonconfiguration")
+        relocate("net.kyori.adventure", "me.glaremasters.guilds.libs.adventure")
+        relocate("net.kyori.examination", "me.glaremasters.guilds.libs.examination")
+        relocate("net.kyori.option", "me.glaremasters.guilds.libs.option")
+        relocate("com.zaxxer.hikari", "me.glaremasters.guilds.libs.hikari")
+        relocate("org.jdbi", "me.glaremasters.guilds.libs.jdbi")
+        relocate("org.mariadb", "me.glaremasters.guilds.libs.mariadb")
 
-        minimize()
+        // NOTE: minimize can break runtime if it strips "unused" classes loaded reflectively.
+        // Start with it OFF while debugging.
+        // minimize()
 
         archiveClassifier.set(null as String?)
         archiveFileName.set("Guilds-${project.version}.jar")
-        destinationDirectory.set(rootProject.tasks.shadowJar.get().destinationDirectory.get())
     }
+    //shadowJar {
+        //fun relocates(vararg dependencies: String) {
+            //dependencies.forEach {
+                //val split = it.split(".")
+                //val name = split.last()
+                //relocate(it, "me.glaremasters.guilds.libs.$name")
+            //}
+        //}
 
-    slimJar {
-        fun relocates(vararg dependencies: String) {
-            dependencies.forEach {
-                val split = it.split(".")
-                val name = split.last()
-                relocate(it, "me.glaremasters.guilds.libs.$name")
-            }
-        }
+        //minimize()
 
-        relocates(
-            "org.bstats",
-            "co.aikar.commands",
-            "co.aikar.locales",
-            "co.aikar.taskchain",
-            "ch.jalu.configme",
-            "com.zaxxer.hikari",
-            "org.jdbi",
-            "org.mariadb.jdbc",
-            "dev.triumphteam.gui",
-            "net.kyori",
-            "com.cryptomorin.xseries",
-            "kotlin"
-        )
-    }
+        //archiveClassifier.set(null as String?)
+        //archiveFileName.set("Guilds-${project.version}.jar")
+        // keep Gradle Shadow default destination (build/libs)
+    //}
 
     processResources {
         expand("version" to rootProject.version)

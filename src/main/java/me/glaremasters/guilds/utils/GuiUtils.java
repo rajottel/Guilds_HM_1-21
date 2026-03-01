@@ -24,9 +24,6 @@
 package me.glaremasters.guilds.utils;
 
 import com.cryptomorin.xseries.XMaterial;
-import com.cryptomorin.xseries.profiles.builder.XSkull;
-import com.cryptomorin.xseries.profiles.objects.ProfileInputType;
-import com.cryptomorin.xseries.profiles.objects.Profileable;
 import me.glaremasters.guilds.guild.GuildMember;
 import org.bukkit.Material;
 import org.bukkit.inventory.ItemFlag;
@@ -67,7 +64,10 @@ public class GuiUtils {
     }
 
     /**
-     * Create a skull item
+     * Create a skull item.
+     *
+     * <p>Paper/Spigot 1.21+ changed internal skull profile handling. Using reflection-based
+     * libraries to inject GameProfiles can break. We use supported Bukkit APIs instead.</p>
      *
      * @param member the member to get the skull from
      * @param name   the name of the item
@@ -79,15 +79,14 @@ public class GuiUtils {
             throw new IllegalArgumentException("Member UUID cannot be null");
         }
 
-        Profileable playerProfile = Profileable.of(member.getUuid());
-        if (playerProfile == null) {
-            final ProfileInputType backupType = ProfileInputType.typeOf("c10591e6909e6a281b371836e462d67a2c78fa0952e910f32b41a26c48c1757c");
-            playerProfile = Profileable.of(backupType, "c10591e6909e6a281b371836e462d67a2c78fa0952e910f32b41a26c48c1757c");
+        ItemStack itemStack;
+        try {
+            itemStack = HeadUtils.createPlayerSkull(member.getUuid());
+        } catch (Exception ex) {
+            itemStack = HeadUtils.createTexturedSkull(HeadUtils.DEFAULT_FALLBACK_HASH);
         }
 
-        final ItemStack itemStack = XSkull.createItem().profile(playerProfile).apply();
         final ItemMeta meta = itemStack.getItemMeta();
-
         meta.setDisplayName(StringUtils.color(name));
         if (!lore.isEmpty()) {
             meta.setLore(lore.stream().map(StringUtils::color).collect(Collectors.toList()));
